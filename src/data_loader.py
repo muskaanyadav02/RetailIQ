@@ -12,113 +12,133 @@ DATA_PATH = (
 )
 
 
-@st.cache_data(show_spinner=False)
-def load_data(path=DATA_PATH):
-    """Load and prepare the Global Superstore dataset."""
+def normalize_columns(df):
+    df = df.copy()
 
-    path = Path(path)
-
-    if not path.exists():
-        raise FileNotFoundError(
-            f"Dataset not found: {path}\n"
-            "Check that superstore.csv is inside the data folder."
-        )
-
-    # Load the dataset
-    df = pd.read_csv(path, encoding="latin1")
-
-    # Standardize column names:
-    # Order.Date -> Order Date
-    # Order_Date -> Order Date
-    # order date -> Order Date
-    df.columns = (
-        df.columns.astype(str)
-        .str.strip()
-        .str.replace(".", " ", regex=False)
-        .str.replace("_", " ", regex=False)
-        .str.replace(r"\s+", " ", regex=True)
-        .str.title()
-    )
-
-    # Handle common alternative column names
-    aliases = {
-        "Order Id": "Order ID",
-        "Order Number": "Order ID",
-        "Ship Date": "Ship Date",
-        "Product": "Product Name",
-        "Product": "Product Name",
-        "Shipping Cost": "Shipping Cost",
-        "Sub Category": "Sub-Category",
-    }
-
-    df = df.rename(columns=aliases)
-
-    # Check required columns
-    required = [
-        "Order Date",
-        "Ship Date",
-        "Order ID",
-        "Product Name",
-        "Sales",
-        "Profit",
-        "Quantity",
-        "Region",
-        "Category",
+    df.columns = [
+        str(col).strip().replace(".", " ")
+        for col in df.columns
     ]
 
-    missing = [col for col in required if col not in df.columns]
+    aliases = {
+        "Sub Category": "Sub-Category",
+        "Subcategory": "Sub-Category",
+        "OrderDate": "Order Date",
+        "ShipDate": "Ship Date",
+        "CustomerName": "Customer Name",
+        "CustomerID": "Customer ID",
+        "OrderID": "Order ID",
+        "ProductID": "Product ID",
+        "ShipMode": "Ship Mode",
+        "OrderPriority": "Order Priority",
+        "ShippingCost": "Shipping Cost",
+    }
+
+    df = df.rename(
+        columns={
+            old: new
+            for old, new in aliases.items()
+            if old in df.columns and old != new
+        }
+    )
+
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    return df
+
+
+@st.cache_data(show_spinner="Loading retail data...")
+def load_data():
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(
+            f"Dataset not found: {DATA_PATH}"
+        )
+
+    try:
+        df = pd.read_csv(
+            DATA_PATH,
+            encoding="utf-8-sig",
+        )
+    except UnicodeDecodeError:
+        df = pd.read_csv(
+            DATA_PATH,
+            encoding="latin1",
+        )
+
+    df = normalize_columns(df)
+
+    missing = [
+        col for col in ["Sales", "Profit"]
+        if col not in df.columns
+    ]
 
     if missing:
         raise ValueError(
-            f"Missing columns: {missing}\n"
-            f"Available columns: {df.columns.tolist()}"
+            f"Missing required columns: {missing}. "
+            f"Found: {df.columns.tolist()}"
         )
 
-    # Convert dates
     for col in ["Order Date", "Ship Date"]:
-        df[col] = pd.to_datetime(
-            df[col],
-            errors="coerce"
-        )
+        if col in df.columns:
+            df[col] = pd.to_datetime(
+                df[col],
+                errors="coerce",
+                dayfirst=False,
+            )
 
-    # Convert numeric columns
-    numeric_columns = [
+    for col in [
         "Sales",
         "Profit",
         "Quantity",
         "Discount",
         "Shipping Cost",
-    ]
-
-    for col in numeric_columns:
+    ]:
         if col in df.columns:
             df[col] = pd.to_numeric(
                 df[col],
-                errors="coerce"
+                errors="coerce",
             )
 
-    # Create date features
-    df["Year"] = df["Order Date"].dt.year
-    df["Month"] = df["Order Date"].dt.month
-    df["Month Name"] = df["Order Date"].dt.strftime("%b")
-    df["Year-Month"] = (
-        df["Order Date"].dt.to_period("M").astype(str)
-    )
-
-    # Calculate shipping duration
-    df["Shipping Days"] = (
-        df["Ship Date"] - df["Order Date"]
-    ).dt.days
-
-    df.loc[df["Shipping Days"] < 0, "Shipping Days"] = float("nan")
-
-    # Clean missing values in important text columns
-    for col in [
+    text_columns = [
         "Region",
         "Category",
+        "Sub-Category",
         "Product Name",
+        "Country",
+        "City",
+        "State",
+        "Segment",
+        "Ship Mode",
+        "Customer Name",
         "Order ID",
-    ]:
-        df[col] = df[col].fillna("Unknown").astype(str)
+    ]
+
+    for col in text_columns:
+        if col in df.columns:
+            df[col] = (
+                df[col]
+                .astype("string")
+                .str.strip()
+            )
+
+    if "Order Date" in df.columns:
+        df["Year"] = df["Order Date"].dt.year
+        df["Month"] = df["Order Date"].dt.month
+        df["Month Name"] = df["Order Date"].dt.strftime("%b")
+        df["Year-Month"] = (
+            df["Order Date"]
+            .dt.to_period("M")
+            .astype(str)
+        )
+
+    if {"Order Date", "Ship Date"}.issubset(df.columns):
+        df["Shipping Days"] = (
+            df["Ship Date"] - df["Order Date"]
+        ).dt.total_seconds() / 86400
+
+        df.loc[
+            df["Shipping Days"] < 0,
+            "Shipping Days",
+        ] = float("nan")
 
     return df

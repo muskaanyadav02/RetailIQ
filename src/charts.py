@@ -1,134 +1,282 @@
+
 import plotly.express as px
 import plotly.graph_objects as go
 
-BG = "#0b1220"
-PANEL = "#111b2e"
-GRID = "#26334a"
-TEXT = "#e7eef9"
-PRIMARY = "#62b6f7"
-ACCENT = "#4f8cff"
-PROFIT = "#22c55e"
-LOSS = "#f87171"
 
-def base_layout(fig, height=390):
+BG = "#111B2E"
+TEXT = "#E8EEF8"
+GRID = "#2B3B55"
+
+BLUE = "#4EA8FF"
+TEAL = "#22D3B4"
+VIOLET = "#9B8AFB"
+ORANGE = "#F5B84B"
+RED = "#FF6B78"
+
+
+def style_chart(fig, height=380):
     fig.update_layout(
         height=height,
         paper_bgcolor=BG,
         plot_bgcolor=BG,
-        font=dict(color=TEXT, family="Arial"),
-        margin=dict(l=45, r=25, t=55, b=45),
-        hoverlabel=dict(bgcolor=PANEL, font_color=TEXT),
+        font=dict(
+            family="Arial",
+            color=TEXT,
+            size=12,
+        ),
+        title=dict(
+            font=dict(size=17, color="#F3F7FF"),
+        ),
+        margin=dict(l=35, r=35, t=65, b=45),
+        hoverlabel=dict(
+            bgcolor="#243550",
+            bordercolor="#405878",
+            font_color="#FFFFFF",
+        ),
         legend=dict(
-            bgcolor="rgba(0,0,0,0)",
-            font=dict(color=TEXT)
+            bgcolor="rgba(17,27,46,0)",
+            font=dict(color=TEXT),
         ),
     )
+
     fig.update_xaxes(
         showgrid=False,
         linecolor=GRID,
         tickfont=dict(color=TEXT),
         title_font=dict(color=TEXT),
+        zerolinecolor=GRID,
     )
+
     fig.update_yaxes(
         gridcolor=GRID,
-        zerolinecolor=GRID,
+        linecolor=GRID,
         tickfont=dict(color=TEXT),
         title_font=dict(color=TEXT),
+        zerolinecolor=GRID,
     )
+
     return fig
 
+
+def empty_chart(
+    title,
+    message="No data available for this selection.",
+):
+    fig = go.Figure()
+
+    fig.add_annotation(
+        text=message,
+        x=0.5,
+        y=0.5,
+        xref="paper",
+        yref="paper",
+        showarrow=False,
+        font=dict(size=13, color="#AFC0D8"),
+    )
+
+    fig.update_layout(title=title)
+
+    return style_chart(fig, 350)
+
+
 def monthly_sales_chart(data):
+    if data.empty or not {
+        "Year-Month",
+        "Sales",
+    }.issubset(data.columns):
+        return empty_chart("Monthly Sales Trend")
+
     fig = px.line(
         data,
         x="Year-Month",
         y="Sales",
         markers=True,
         title="Monthly Sales Trend",
+        color_discrete_sequence=[BLUE],
     )
+
     fig.update_traces(
-        line=dict(color=PRIMARY, width=3),
+        line=dict(width=3),
         marker=dict(size=7),
-        hovertemplate="%{x}<br>Sales: $%{y:,.0f}<extra></extra>",
+        hovertemplate=(
+            "%{x}<br>Sales: $%{y:,.2f}<extra></extra>"
+        ),
     )
-    fig.update_layout(title_font_size=17)
-    return base_layout(fig, 410)
+
+    return style_chart(fig, 390)
+
 
 def category_chart(data):
+    if data.empty or "Category" not in data.columns:
+        return empty_chart("Sales and Profit by Category")
+
     fig = go.Figure()
-    fig.add_bar(
-        x=data["Category"],
-        y=data["Sales"],
-        name="Sales",
-        marker_color=PRIMARY,
-        text=data["Sales"],
-        texttemplate="$%{text:.3s}",
-        textposition="outside",
-        hovertemplate="%{x}<br>Sales: $%{y:,.0f}<extra></extra>",
-    )
-    fig.add_bar(
-        x=data["Category"],
-        y=data["Profit"],
-        name="Profit",
-        marker_color=PROFIT,
-        text=data["Profit"],
-        texttemplate="$%{text:.3s}",
-        textposition="outside",
-        hovertemplate="%{x}<br>Profit: $%{y:,.0f}<extra></extra>",
-    )
+
+    if "Sales" in data.columns:
+        fig.add_bar(
+            x=data["Category"],
+            y=data["Sales"],
+            name="Sales",
+            marker_color=BLUE,
+            hovertemplate=(
+                "%{x}<br>Sales: $%{y:,.2f}<extra></extra>"
+            ),
+        )
+
+    if "Profit" in data.columns:
+        fig.add_bar(
+            x=data["Category"],
+            y=data["Profit"],
+            name="Profit",
+            marker_color=TEAL,
+            hovertemplate=(
+                "%{x}<br>Profit: $%{y:,.2f}<extra></extra>"
+            ),
+        )
+
     fig.update_layout(
         title="Sales vs Profit by Category",
         barmode="group",
-        yaxis_title="Amount",
+        yaxis_title="Amount ($)",
     )
-    return base_layout(fig, 410)
+
+    return style_chart(fig, 390)
+
 
 def region_chart(data):
-    fig = px.bar(
-        data,
-        x="Region",
-        y="Sales",
-        text="Sales",
-        title="Sales by Region",
-    )
-    fig.update_traces(
-        marker_color=PRIMARY,
-        texttemplate="$%{text:.3s}",
-        textposition="outside",
-        hovertemplate="%{x}<br>Sales: $%{y:,.0f}<extra></extra>",
-    )
-    fig.update_layout(xaxis_tickangle=-35)
-    return base_layout(fig, 410)
+    if data.empty or not {
+        "Region",
+        "Sales",
+    }.issubset(data.columns):
+        return empty_chart("Sales by Region")
 
-def top_products_chart(data):
-    data = data.sort_values("Profit", ascending=True)
+    data = data.sort_values(
+        "Sales",
+        ascending=True,
+    )
+
     fig = px.bar(
         data,
-        x="Profit",
-        y="Product Name",
+        x="Sales",
+        y="Region",
         orientation="h",
-        text="Profit",
-        title="Top 10 Products by Profit",
+        title="Sales by Region",
+        text="Sales",
+        color="Sales",
+        color_continuous_scale=[
+            "#244A78",
+            BLUE,
+        ],
     )
+
     fig.update_traces(
-        marker_color=PROFIT,
         texttemplate="$%{text:,.0f}",
         textposition="outside",
-        hovertemplate="%{y}<br>Profit: $%{x:,.0f}<extra></extra>",
+        cliponaxis=False,
+        hovertemplate=(
+            "%{y}<br>Sales: $%{x:,.2f}<extra></extra>"
+        ),
     )
-    return base_layout(fig, 460)
 
-def subcategory_chart(data):
-    colors = [LOSS if x < 0 else PROFIT for x in data["Profit"]]
+    fig.update_layout(
+        coloraxis_showscale=False,
+    )
+
+    return style_chart(
+        fig,
+        max(360, len(data) * 34),
+    )
+
+
+def top_products_chart(data):
+    if data.empty or "Product Name" not in data.columns:
+        return empty_chart("Top Products")
+
+    metric = (
+        "Profit"
+        if "Profit" in data.columns
+        else "Sales"
+    )
+
+    if metric not in data.columns:
+        return empty_chart("Top Products")
+
+    data = data.sort_values(
+        metric,
+        ascending=True,
+    )
+
     fig = px.bar(
         data,
-        x="Profit",
-        y="Sub-Category",
+        x=metric,
+        y="Product Name",
         orientation="h",
+        title=f"Products by {metric}",
+        color=metric,
+        color_continuous_scale=[
+            "#244A78",
+            BLUE,
+        ],
+        hover_data=[
+            col for col in ["Sales", "Profit", "Quantity"]
+            if col in data.columns
+        ],
+    )
+
+    fig.update_layout(
+        coloraxis_showscale=False,
+    )
+
+    return style_chart(
+        fig,
+        max(400, len(data) * 30),
+    )
+
+
+def subcategory_chart(data):
+    if not {
+        "Sub-Category",
+        "Profit",
+    }.issubset(data.columns):
+        return empty_chart("Profitability by Sub-Category")
+
+    if data.empty:
+        return empty_chart("Profitability by Sub-Category")
+
+    data = data.sort_values(
+        "Profit",
+        ascending=True,
+    )
+
+    colors = [
+        RED if value < 0 else TEAL
+        for value in data["Profit"]
+    ]
+
+    fig = go.Figure(
+        go.Bar(
+            x=data["Profit"],
+            y=data["Sub-Category"],
+            orientation="h",
+            marker_color=colors,
+            hovertemplate=(
+                "%{y}<br>Profit: $%{x:,.2f}<extra></extra>"
+            ),
+        )
+    )
+
+    fig.add_vline(
+        x=0,
+        line_color=GRID,
+        line_width=1,
+    )
+
+    fig.update_layout(
         title="Profitability by Sub-Category",
+        xaxis_title="Profit ($)",
     )
-    fig.update_traces(
-        marker_color=colors,
-        hovertemplate="%{y}<br>Profit: $%{x:,.0f}<extra></extra>",
+
+    return style_chart(
+        fig,
+        max(400, len(data) * 28),
     )
-    fig.add_vline(x=0, line_color=GRID, line_width=1)
-    return base_layout(fig, 500)

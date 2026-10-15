@@ -1,5 +1,7 @@
+
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
 from src.data_loader import load_data
 from src.analysis import (
@@ -13,446 +15,780 @@ from src.analysis import (
     insights,
 )
 from src.charts import (
-    monthly_sales_chart,
+    style_chart,
+    empty_chart,
     category_chart,
     region_chart,
     top_products_chart,
     subcategory_chart,
 )
 
-# ---------------------------------------------------------
-# PAGE CONFIG
-# ---------------------------------------------------------
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
+
 st.set_page_config(
-    page_title="RetailIQ | Sales Intelligence",
+    page_title="RetailIQ | Retail Analytics",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ---------------------------------------------------------
-# PROFESSIONAL CSS
-# ---------------------------------------------------------
+# =========================================================
+# DARK NAVY THEME
+# =========================================================
+
 st.markdown("""
 <style>
-    .stApp {
-        background: #080f1d;
-        color: #e7eef9;
-    }
+.stApp {
+    background: #0B1120;
+    color: #E8EEF8;
+}
 
-    [data-testid="stSidebar"] {
-        background: #0e1728;
-        border-right: 1px solid #22304a;
-    }
+[data-testid="stHeader"] {
+    background: #0B1120;
+}
 
-    [data-testid="stSidebar"] * {
-        color: #dbe7f7;
-    }
+[data-testid="stSidebar"] {
+    background: #111B2E;
+    border-right: 1px solid #293A55;
+}
 
-    .block-container {
-        max-width: 1450px;
-        padding-top: 2.2rem;
-        padding-bottom: 3rem;
-    }
+[data-testid="stSidebar"] * {
+    color: #E3EBF7;
+}
 
-    h1, h2, h3 {
-        letter-spacing: -0.4px;
-    }
+.block-container {
+    max-width: 1500px;
+    padding-top: 2.5rem !important;
+    padding-bottom: 3rem;
+}
 
-    .brand {
-        font-size: 30px;
-        font-weight: 800;
-        margin-bottom: 2px;
-    }
+h1, h2, h3, h4 {
+    color: #F3F7FF !important;
+    letter-spacing: -0.4px;
+}
 
-    .brand-sub {
-        color: #7ea6d4;
-        font-size: 13px;
-        margin-bottom: 30px;
-    }
+p, label {
+    color: #C1CDE0;
+}
 
-    .eyebrow {
-        display: inline-block;
-        padding: 7px 14px;
-        border-radius: 999px;
-        background: #10285a;
-        border: 1px solid #2457b7;
-        color: #64b5ff;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: .5px;
-        margin-bottom: 12px;
-    }
+[data-testid="stCaptionContainer"] {
+    color: #91A5C1;
+}
 
-    .hero-title {
-        font-size: 42px;
-        line-height: 1.05;
-        font-weight: 850;
-        margin: 0;
-    }
+div[data-testid="stMetric"] {
+    background: #16243A;
+    border: 1px solid #2A3D5A;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 5px 18px rgba(0,0,0,0.16);
+}
 
-    .hero-subtitle {
-        color: #8da9ca;
-        font-size: 16px;
-        margin-top: 8px;
-        margin-bottom: 25px;
-    }
+div[data-testid="stMetricLabel"] {
+    color: #AFC0D8;
+}
 
-    .filter-banner {
-        background: linear-gradient(90deg, #122b50, #10233f);
-        border: 1px solid #1e477c;
-        padding: 15px 18px;
-        border-radius: 12px;
-        color: #6ec1ff;
-        font-weight: 600;
-        margin-bottom: 18px;
-    }
+div[data-testid="stMetricValue"] {
+    color: #56B4FF;
+}
 
-    .kpi-card {
-        background: linear-gradient(145deg, #121e33, #0e1728);
-        border: 1px solid #263750;
-        border-radius: 15px;
-        padding: 20px 21px;
-        min-height: 132px;
-        box-shadow: 0 10px 25px rgba(0,0,0,.16);
-    }
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    border-bottom: 1px solid #293A55;
+}
 
-    .kpi-label {
-        color: #8db1d9;
-        font-size: 12px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .5px;
-    }
+.stTabs [data-baseweb="tab"] {
+    color: #B9C8DD;
+    padding: 12px 16px;
+}
 
-    .kpi-value {
-        color: #f4f8ff;
-        font-size: 29px;
-        font-weight: 800;
-        margin-top: 9px;
-    }
+.stTabs [aria-selected="true"] {
+    color: #67BDFF !important;
+    border-bottom-color: #398BFA !important;
+}
 
-    .kpi-note {
-        color: #607d9f;
-        font-size: 12px;
-        margin-top: 5px;
-    }
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div {
+    background: #16243A;
+    border-color: #344965;
+    color: #F0F5FF;
+}
 
-    .section-title {
-        font-size: 22px;
-        font-weight: 800;
-        margin-top: 28px;
-        margin-bottom: 13px;
-    }
+input, textarea {
+    color: #F0F5FF !important;
+}
 
-    .insight-card {
-        background: #101a2c;
-        border: 1px solid #253650;
-        border-radius: 11px;
-        padding: 14px 17px;
-        margin: 9px 0;
-        color: #dbe7f7;
-        font-size: 14px;
-    }
+.stButton button,
+.stDownloadButton button {
+    background: #1D4ED8;
+    color: #FFFFFF;
+    border: 1px solid #3977F5;
+    border-radius: 9px;
+    font-weight: 650;
+}
 
-    .insight-success { border-left: 4px solid #22c55e; }
-    .insight-info { border-left: 4px solid #38bdf8; }
-    .insight-warning { border-left: 4px solid #f59e0b; }
-    .insight-neutral { border-left: 4px solid #64748b; }
+.stButton button:hover,
+.stDownloadButton button:hover {
+    background: #2563EB;
+    border-color: #60A5FA;
+    color: #FFFFFF;
+}
 
-    .side-stat {
-        border-top: 1px solid #263650;
-        margin-top: 24px;
-        padding-top: 18px;
-        color: #7796bb;
-        font-size: 12px;
-        line-height: 1.8;
-    }
+[data-testid="stDataFrame"] {
+    border: 1px solid #293A55;
+    border-radius: 12px;
+    overflow: hidden;
+}
 
-    .footer {
-        border-top: 1px solid #22304a;
-        margin-top: 45px;
-        padding-top: 18px;
-        color: #657f9e;
-        font-size: 12px;
-        text-align: center;
-    }
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: #293A55 !important;
+    border-radius: 14px;
+}
 
-    .stDownloadButton button {
-        width: 100%;
-    }
+div[data-testid="stAlert"] {
+    border-radius: 10px;
+}
+
+hr {
+    border-color: #293A55 !important;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
+
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
+
+@st.cache_data
+def csv_bytes(frame):
+    return frame.to_csv(index=False).encode("utf-8")
+
+
+def show_chart(fig):
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={
+            "displaylogo": False,
+            "scrollZoom": False,
+        },
+    )
+
+
+def search_frame(frame, columns, query):
+    if not query.strip() or not columns:
+        return frame
+
+    mask = pd.Series(False, index=frame.index)
+
+    for col in columns:
+        mask |= frame[col].astype(str).str.contains(
+            query.strip(),
+            case=False,
+            na=False,
+            regex=False,
+        )
+
+    return frame[mask]
+
+
+def money(value):
+    return f"${value:,.0f}"
+
+
+# =========================================================
 # LOAD DATA
-# ---------------------------------------------------------
+# =========================================================
+
 try:
     df = load_data()
-except Exception as e:
-    st.error(
-        "Unable to load the dataset. Make sure "
-        "`data/superstore.csv` exists."
+
+except Exception as exc:
+    st.error("RetailIQ could not load the dataset.")
+    st.code(str(exc))
+    st.info(
+        "Check that data/superstore.csv exists and "
+        "contains Sales and Profit columns."
     )
-    st.exception(e)
     st.stop()
 
-# ---------------------------------------------------------
-# SIDEBAR
-# ---------------------------------------------------------
+if df.empty:
+    st.warning("The dataset is empty.")
+    st.stop()
+
+required = ["Sales", "Profit"]
+missing = [col for col in required if col not in df.columns]
+
+if missing:
+    st.error(f"Missing required columns: {missing}")
+    st.write("Detected columns:", df.columns.tolist())
+    st.stop()
+
+
+# =========================================================
+# SIDEBAR FILTERS
+# =========================================================
+
 with st.sidebar:
-    st.markdown('<div class="brand">📊 RetailIQ</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="brand-sub">Sales & Profit Intelligence</div>',
-        unsafe_allow_html=True
+    st.title("📊 RetailIQ")
+    st.caption("RETAIL SALES INTELLIGENCE")
+    st.divider()
+
+    st.subheader("Explore the data")
+
+    years = (
+        sorted(df["Year"].dropna().astype(int).unique().tolist())
+        if "Year" in df.columns else []
     )
 
-    st.markdown("### 🔎 Dashboard Filters")
+    regions = (
+        sorted(df["Region"].dropna().unique().tolist())
+        if "Region" in df.columns else []
+    )
 
-    years = sorted(df["Year"].dropna().unique().astype(int).tolist())
-    regions = sorted(df["Region"].dropna().unique().tolist())
-    categories = sorted(df["Category"].dropna().unique().tolist())
+    categories = (
+        sorted(df["Category"].dropna().unique().tolist())
+        if "Category" in df.columns else []
+    )
 
-    selected_year = st.selectbox(
-        "📅 Year",
+    year = st.selectbox(
+        "Order year",
         ["All"] + years,
-        index=0,
+        key="year_filter",
     )
-    selected_region = st.selectbox(
-        "🌍 Region",
+
+    region = st.selectbox(
+        "Region",
         ["All"] + regions,
-        index=0,
+        key="region_filter",
     )
-    selected_category = st.selectbox(
-        "📦 Category",
+
+    category = st.selectbox(
+        "Category",
         ["All"] + categories,
-        index=0,
+        key="category_filter",
     )
 
-    st.markdown(
-        f"""
-        <div class="side-stat">
-            <b>Dataset</b><br>
-            Global Superstore<br><br>
-            <b>Records</b><br>
-            {len(df):,} transactions<br><br>
-            <b>Analytics</b><br>
-            Sales • Profit • Products<br>
-            Regions • Shipping
-        </div>
-        """,
-        unsafe_allow_html=True
+    if (
+        "Order Date" in df.columns
+        and df["Order Date"].notna().any()
+    ):
+        min_date = df["Order Date"].min().date()
+        max_date = df["Order Date"].max().date()
+
+        date_range = st.date_input(
+            "Order date range",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            key="date_filter",
+        )
+    else:
+        min_date = max_date = None
+        date_range = None
+
+    def reset_filters():
+        st.session_state["year_filter"] = "All"
+        st.session_state["region_filter"] = "All"
+        st.session_state["category_filter"] = "All"
+
+        if min_date and max_date:
+            st.session_state["date_filter"] = (
+                min_date,
+                max_date,
+            )
+
+    st.button(
+        "↺ Reset all filters",
+        on_click=reset_filters,
+        use_container_width=True,
     )
 
-    csv = df.to_csv(index=False).encode("utf-8")
+    st.divider()
+
+    st.caption("Dataset: Global Superstore")
+    st.caption(f"{len(df):,} records available")
+
     st.download_button(
-        "⬇️ Download Full Dataset",
-        data=csv,
-        file_name="retailiq_superstore.csv",
+        "⬇ Download source data",
+        data=csv_bytes(df),
+        file_name="retailiq_source_data.csv",
         mime="text/csv",
+        use_container_width=True,
     )
 
-# ---------------------------------------------------------
-# FILTER DATA
-# ---------------------------------------------------------
-data = filtered_data(
-    df,
-    selected_year,
-    selected_region,
-    selected_category,
+
+# =========================================================
+# APPLY FILTERS
+# =========================================================
+
+data = filtered_data(df, year, region, category)
+
+if (
+    date_range
+    and isinstance(date_range, (tuple, list))
+    and len(date_range) == 2
+    and "Order Date" in data.columns
+):
+    start = pd.Timestamp(date_range[0])
+    end = pd.Timestamp(date_range[1]) + pd.Timedelta(days=1)
+
+    data = data[
+        (data["Order Date"] >= start)
+        & (data["Order Date"] < end)
+    ]
+
+
+# =========================================================
+# HEADER
+# =========================================================
+
+st.title("RetailIQ")
+st.markdown(
+    "**Retail Sales & Profit Intelligence**"
+    "  ·  Interactive business analytics"
 )
+
+st.write(
+    "Explore sales trends, product performance, regional results, "
+    "and business opportunities using retail data."
+)
+
+st.caption(
+    f"Showing {len(data):,} of {len(df):,} records"
+    f"  ·  Year: {year}"
+    f"  ·  Region: {region}"
+    f"  ·  Category: {category}"
+)
+
+st.divider()
+
+if data.empty:
+    st.warning(
+        "No records match the selected filters. "
+        "Change your filters or reset them."
+    )
+    st.stop()
+
+
+# =========================================================
+# KPI CARDS
+# =========================================================
 
 k = kpis(data)
 
-year_text = str(selected_year)
-region_text = str(selected_region)
-category_text = str(selected_category)
+st.subheader("Business at a glance")
 
-st.markdown('<div class="eyebrow">DATA ANALYTICS PROJECT</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-title">RetailIQ</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="hero-subtitle">Sales & Profit Intelligence Dashboard</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    f"""
-    <div class="filter-banner">
-        🔎 Active Filters &nbsp;—&nbsp;
-        Year: {year_text} &nbsp;|&nbsp;
-        Region: {region_text} &nbsp;|&nbsp;
-        Category: {category_text}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# ---------------------------------------------------------
-# KPI CARDS
-# ---------------------------------------------------------
 c1, c2, c3, c4 = st.columns(4)
 
-with c1:
-    st.markdown(
-        f"""<div class="kpi-card">
-        <div class="kpi-label">💰 Total Sales</div>
-        <div class="kpi-value">${k['sales']:,.0f}</div>
-        <div class="kpi-note">Revenue generated</div>
-        </div>""",
-        unsafe_allow_html=True
+c1.metric("Total Sales", money(k["sales"]))
+c2.metric("Total Profit", money(k["profit"]))
+c3.metric("Unique Orders", f"{k['orders']:,}")
+c4.metric("Profit Margin", f"{k['margin']:.2f}%")
+
+c5, c6, c7 = st.columns(3)
+
+c5.metric("Units Sold", f"{k['quantity']:,.0f}")
+c6.metric("Average Order Value", f"${k['aov']:,.2f}")
+c7.metric("Avg. Shipping Time", f"{k['shipping']:.1f} days")
+
+
+# =========================================================
+# DASHBOARD TABS
+# =========================================================
+
+overview, products, business, explorer = st.tabs([
+    "📈 Overview",
+    "🔎 Product Explorer",
+    "💡 Business Insights",
+    "📋 Data Explorer",
+])
+
+
+# =========================================================
+# OVERVIEW
+# =========================================================
+
+with overview:
+    st.subheader("Sales performance")
+
+    metric = st.selectbox(
+        "Select trend metric",
+        ["Sales", "Profit", "Orders", "Quantity"],
+        key="overview_metric",
     )
 
-with c2:
-    st.markdown(
-        f"""<div class="kpi-card">
-        <div class="kpi-label">📈 Total Profit</div>
-        <div class="kpi-value">${k['profit']:,.0f}</div>
-        <div class="kpi-note">Net profit generated</div>
-        </div>""",
-        unsafe_allow_html=True
+    if "Year-Month" not in data.columns:
+        show_chart(empty_chart("Monthly Performance"))
+
+    else:
+        if metric == "Orders" and "Order ID" in data.columns:
+            trend = (
+                data.groupby("Year-Month")["Order ID"]
+                .nunique()
+                .reset_index(name="Orders")
+            )
+            y_col = "Orders"
+
+        elif metric in data.columns:
+            trend = (
+                data.groupby("Year-Month")[metric]
+                .sum()
+                .reset_index()
+            )
+            y_col = metric
+
+        else:
+            trend = pd.DataFrame()
+            y_col = None
+
+        if not trend.empty and y_col:
+            trend = trend.sort_values("Year-Month")
+
+            chart_type = st.radio(
+                "Chart style",
+                ["Line", "Area", "Bar"],
+                horizontal=True,
+                key="trend_chart_type",
+            )
+
+            if chart_type == "Line":
+                fig = px.line(
+                    trend,
+                    x="Year-Month",
+                    y=y_col,
+                    markers=True,
+                    title=f"Monthly {metric}",
+                    color_discrete_sequence=["#4EA8FF"],
+                )
+                fig.update_traces(line_width=3)
+
+            elif chart_type == "Area":
+                fig = px.area(
+                    trend,
+                    x="Year-Month",
+                    y=y_col,
+                    title=f"Monthly {metric}",
+                    color_discrete_sequence=["#3977D5"],
+                )
+
+            else:
+                fig = px.bar(
+                    trend,
+                    x="Year-Month",
+                    y=y_col,
+                    title=f"Monthly {metric}",
+                    color_discrete_sequence=["#4EA8FF"],
+                )
+
+            fig.update_traces(
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}<extra></extra>"
+                )
+            )
+
+            show_chart(style_chart(fig, 420))
+
+        else:
+            st.info("This metric is unavailable.")
+
+    st.subheader("Category and regional performance")
+
+    left, right = st.columns(2)
+
+    with left:
+        show_chart(category_chart(category_summary(data)))
+
+    with right:
+        show_chart(region_chart(region_summary(data)))
+
+    st.subheader("Profitability and sales mix")
+
+    left, right = st.columns(2)
+
+    with left:
+        show_chart(subcategory_chart(subcategory_profit(data)))
+
+    with right:
+        summary = category_summary(data)
+
+        if (
+            not summary.empty
+            and {"Category", "Sales"}.issubset(summary.columns)
+        ):
+            fig = px.pie(
+                summary,
+                names="Category",
+                values="Sales",
+                hole=0.58,
+                title="Share of Sales by Category",
+                color_discrete_sequence=[
+                    "#4EA8FF",
+                    "#22D3B4",
+                    "#9B8AFB",
+                    "#F5B84B",
+                ],
+            )
+
+            show_chart(style_chart(fig, 390))
+
+        else:
+            show_chart(empty_chart("Share of Sales by Category"))
+
+
+# =========================================================
+# PRODUCT EXPLORER
+# =========================================================
+
+with products:
+    st.subheader("Discover product performance")
+
+    st.write(
+        "Search products, rank performers, and export the results."
     )
 
-with c3:
-    st.markdown(
-        f"""<div class="kpi-card">
-        <div class="kpi-label">🛒 Total Orders</div>
-        <div class="kpi-value">{k['orders']:,}</div>
-        <div class="kpi-note">Unique customer orders</div>
-        </div>""",
-        unsafe_allow_html=True
-    )
+    if "Product Name" not in data.columns:
+        st.warning("Product Name is not available.")
 
-with c4:
-    st.markdown(
-        f"""<div class="kpi-card">
-        <div class="kpi-label">📊 Profit Margin</div>
-        <div class="kpi-value">{k['margin']:.2f}%</div>
-        <div class="kpi-note">Overall profitability</div>
-        </div>""",
-        unsafe_allow_html=True
-    )
+    else:
+        query = st.text_input(
+            "Search products",
+            placeholder="Search for chairs, phones, tables...",
+            key="product_search",
+        )
 
-# ---------------------------------------------------------
-# OPERATIONAL OVERVIEW
-# ---------------------------------------------------------
-st.markdown('<div class="section-title">📌 Operational Overview</div>', unsafe_allow_html=True)
+        product_data = data.copy()
 
-o1, o2, o3 = st.columns(3)
+        if query.strip():
+            product_data = product_data[
+                product_data["Product Name"].astype(str).str.contains(
+                    query.strip(),
+                    case=False,
+                    na=False,
+                    regex=False,
+                )
+            ]
 
-with o1:
-    st.metric("📦 Total Quantity", f"{k['quantity']:,.0f}")
+        metrics = [
+            col for col in ["Sales", "Profit", "Quantity"]
+            if col in product_data.columns
+        ]
 
-with o2:
-    st.metric("💳 Average Order Value", f"${k['aov']:,.0f}")
+        if not metrics:
+            st.warning("No product metrics are available.")
 
-with o3:
-    st.metric("🚚 Average Shipping Time", f"{k['shipping']:.1f} days")
+        else:
+            selected_metric = st.selectbox(
+                "Rank products by",
+                metrics,
+                key="product_metric",
+            )
 
-# ---------------------------------------------------------
-# SALES PERFORMANCE
-# ---------------------------------------------------------
-st.markdown('<div class="section-title">📈 Sales Performance</div>', unsafe_allow_html=True)
+            ranking = st.radio(
+                "Performance",
+                ["Top performers", "Bottom performers"],
+                horizontal=True,
+            )
 
-monthly = monthly_sales(data)
-st.plotly_chart(
-    monthly_sales_chart(monthly),
-    use_container_width=True,
-    config={"displaylogo": False},
-)
+            limit = st.slider(
+                "Number of products",
+                min_value=5,
+                max_value=25,
+                value=10,
+                step=5,
+                key="product_limit",
+            )
 
-# ---------------------------------------------------------
-# CATEGORY + REGION
-# ---------------------------------------------------------
-left, right = st.columns(2)
+            summary = top_products(
+                product_data,
+                n=len(product_data),
+                metric=selected_metric,
+            )
 
-with left:
-    cat = category_summary(data)
-    st.plotly_chart(
-        category_chart(cat),
-        use_container_width=True,
-        config={"displaylogo": False},
-    )
+            if not summary.empty:
+                summary = (
+                    summary.sort_values(
+                        selected_metric,
+                        ascending=(ranking == "Bottom performers"),
+                    )
+                    .head(limit)
+                    .reset_index(drop=True)
+                )
 
-with right:
-    reg = region_summary(data)
-    st.plotly_chart(
-        region_chart(reg),
-        use_container_width=True,
-        config={"displaylogo": False},
-    )
+                show_chart(top_products_chart(summary))
 
-# ---------------------------------------------------------
-# PRODUCT + SUBCATEGORY
-# ---------------------------------------------------------
-st.markdown('<div class="section-title">🏆 Product & Profitability Analysis</div>', unsafe_allow_html=True)
+                st.dataframe(
+                    summary,
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
-left, right = st.columns(2)
+                st.download_button(
+                    "⬇ Download product analysis",
+                    data=csv_bytes(summary),
+                    file_name="retailiq_product_analysis.csv",
+                    mime="text/csv",
+                )
 
-with left:
-    products = top_products(data, 10)
-    st.plotly_chart(
-        top_products_chart(products),
-        use_container_width=True,
-        config={"displaylogo": False},
-    )
+            else:
+                st.info("No matching products found.")
 
-with right:
-    sub = subcategory_profit(data)
-    st.plotly_chart(
-        subcategory_chart(sub),
-        use_container_width=True,
-        config={"displaylogo": False},
-    )
 
-# ---------------------------------------------------------
+# =========================================================
 # BUSINESS INSIGHTS
-# ---------------------------------------------------------
-st.markdown('<div class="section-title">💡 Business Insights</div>', unsafe_allow_html=True)
+# =========================================================
 
-for kind, message in insights(data):
-    icon = {
-        "success": "🏆",
-        "info": "🌍",
-        "warning": "⚠️",
-        "neutral": "🚚",
-    }.get(kind, "•")
+with business:
+    st.subheader("Automated business insights")
 
-    st.markdown(
-        f'<div class="insight-card insight-{kind}">{icon}&nbsp;&nbsp;{message}</div>',
-        unsafe_allow_html=True,
+    st.write(
+        "Observations below are calculated from your selected data."
     )
 
-# ---------------------------------------------------------
-# FILTERED DATA PREVIEW
-# ---------------------------------------------------------
-st.markdown('<div class="section-title">🗂️ Filtered Dataset</div>', unsafe_allow_html=True)
+    icons = {
+        "success": "🏆",
+        "info": "📊",
+        "warning": "⚠️",
+        "neutral": "💡",
+    }
 
-with st.expander(f"View filtered records ({len(data):,})"):
+    for kind, message in insights(data):
+        icon = icons.get(kind, "💡")
+
+        if kind == "warning":
+            st.warning(f"{icon} {message}")
+        elif kind == "success":
+            st.success(f"{icon} {message}")
+        elif kind == "info":
+            st.info(f"{icon} {message}")
+        else:
+            st.write(f"{icon} {message}")
+
+    st.subheader("Compare regional performance")
+
+    regions_df = region_summary(data)
+
+    if not regions_df.empty:
+        options = [
+            col for col in ["Sales", "Profit", "Quantity"]
+            if col in regions_df.columns
+        ]
+
+        if options:
+            region_metric = st.selectbox(
+                "Regional metric",
+                options,
+                key="region_compare_metric",
+            )
+
+            fig = px.bar(
+                regions_df.sort_values(
+                    region_metric,
+                    ascending=False,
+                ),
+                x="Region",
+                y=region_metric,
+                color=region_metric,
+                color_continuous_scale=[
+                    "#244A78",
+                    "#4EA8FF",
+                ],
+                title=f"Regions ranked by {region_metric}",
+            )
+
+            fig.update_layout(coloraxis_showscale=False)
+
+            show_chart(style_chart(fig, 400))
+
+    else:
+        st.info("Regional data is unavailable.")
+
+
+# =========================================================
+# DATA EXPLORER
+# =========================================================
+
+with explorer:
+    st.subheader("Explore underlying records")
+
+    st.write(
+        "Search filtered records, customize columns, and download results."
+    )
+
+    searchable_columns = [
+        col for col in [
+            "Order ID",
+            "Customer Name",
+            "Product Name",
+            "City",
+            "State",
+            "Country",
+        ]
+        if col in data.columns
+    ]
+
+    search = st.text_input(
+        "Search records",
+        placeholder="Search customers, products, orders, or locations...",
+        key="data_search",
+    )
+
+    view = search_frame(
+        data.copy(),
+        searchable_columns,
+        search,
+    )
+
+    defaults = [
+        col for col in [
+            "Order Date",
+            "Order ID",
+            "Customer Name",
+            "Region",
+            "Category",
+            "Sub-Category",
+            "Product Name",
+            "Sales",
+            "Profit",
+            "Quantity",
+        ]
+        if col in view.columns
+    ]
+
+    selected_columns = st.multiselect(
+        "Columns to display",
+        options=list(view.columns),
+        default=defaults,
+        key="display_columns",
+    )
+
+    st.caption(f"{len(view):,} matching records")
+
     st.dataframe(
-        data,
+        view[selected_columns],
         use_container_width=True,
         height=430,
         hide_index=True,
     )
 
-    filtered_csv = data.to_csv(index=False).encode("utf-8")
     st.download_button(
-        "⬇️ Download Filtered Data",
-        data=filtered_csv,
-        file_name="retailiq_filtered_data.csv",
+        "⬇ Download filtered records",
+        data=csv_bytes(view[selected_columns]),
+        file_name="retailiq_filtered_records.csv",
         mime="text/csv",
     )
 
-# ---------------------------------------------------------
+
+# =========================================================
 # FOOTER
-# ---------------------------------------------------------
-st.markdown(
-    """
-    <div class="footer">
-        <b>RetailIQ — Sales & Profit Intelligence Dashboard</b><br>
-        Data Analytics Project • Built with Python, Pandas, Plotly & Streamlit<br>
-        Developed for academic demonstration and business analytics
-    </div>
-    """,
-    unsafe_allow_html=True
+# =========================================================
+
+st.divider()
+
+st.caption(
+    "RetailIQ  |  Interactive Retail Analytics  |  "
+    "Python · Pandas · Plotly · Streamlit"
 )

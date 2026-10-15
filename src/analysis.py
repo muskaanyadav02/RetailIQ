@@ -1,27 +1,51 @@
-import pandas as pd
-import numpy as np
 
-def filtered_data(df, year="All", region="All", category="All"):
+import pandas as pd
+
+
+def filtered_data(
+    df,
+    year="All",
+    region="All",
+    category="All",
+):
     out = df.copy()
 
-    if year != "All":
+    if year != "All" and "Year" in out.columns:
         out = out[out["Year"] == int(year)]
-    if region != "All":
+
+    if region != "All" and "Region" in out.columns:
         out = out[out["Region"] == region]
-    if category != "All":
+
+    if category != "All" and "Category" in out.columns:
         out = out[out["Category"] == category]
 
     return out
 
-def kpis(df):
-    sales = df["Sales"].sum()
-    profit = df["Profit"].sum()
-    quantity = df["Quantity"].sum()
-    orders = df["Order ID"].nunique() if "Order ID" in df else len(df)
 
-    margin = (profit / sales * 100) if sales else 0
-    aov = sales / orders if orders else 0
-    shipping = df["Shipping Days"].dropna().mean() if "Shipping Days" in df else 0
+def kpis(df):
+    sales = float(df["Sales"].sum()) if "Sales" in df else 0.0
+    profit = float(df["Profit"].sum()) if "Profit" in df else 0.0
+    quantity = (
+        float(df["Quantity"].sum())
+        if "Quantity" in df.columns else 0.0
+    )
+
+    orders = (
+        int(df["Order ID"].nunique())
+        if "Order ID" in df.columns
+        else len(df)
+    )
+
+    margin = profit / sales * 100 if sales else 0.0
+    aov = sales / orders if orders else 0.0
+
+    shipping = 0.0
+
+    if "Shipping Days" in df.columns:
+        average = df["Shipping Days"].mean()
+
+        if pd.notna(average):
+            shipping = float(average)
 
     return {
         "sales": sales,
@@ -33,91 +57,201 @@ def kpis(df):
         "shipping": shipping,
     }
 
+
 def monthly_sales(df):
-    if df.empty:
-        return pd.DataFrame(columns=["Year-Month", "Sales"])
-    result = (
+    if not {"Year-Month", "Sales"}.issubset(df.columns):
+        return pd.DataFrame(
+            columns=["Year-Month", "Sales"]
+        )
+
+    return (
         df.groupby("Year-Month", as_index=False)["Sales"]
         .sum()
         .sort_values("Year-Month")
     )
-    return result
+
 
 def category_summary(df):
-    return (
-        df.groupby("Category", as_index=False)
-        .agg(Sales=("Sales", "sum"), Profit=("Profit", "sum"))
-        .sort_values("Sales", ascending=False)
+    if "Category" not in df.columns:
+        return pd.DataFrame(
+            columns=["Category", "Sales", "Profit"]
+        )
+
+    metrics = [
+        col for col in ["Sales", "Profit", "Quantity"]
+        if col in df.columns
+    ]
+
+    if not metrics:
+        return pd.DataFrame(columns=["Category"])
+
+    result = (
+        df.groupby("Category", as_index=False)[metrics]
+        .sum()
     )
+
+    if "Sales" in result.columns:
+        result = result.sort_values(
+            "Sales",
+            ascending=False,
+        )
+
+    return result
+
 
 def region_summary(df):
-    return (
-        df.groupby("Region", as_index=False)
-        .agg(Sales=("Sales", "sum"), Profit=("Profit", "sum"))
-        .sort_values("Sales", ascending=False)
+    if "Region" not in df.columns:
+        return pd.DataFrame(
+            columns=["Region", "Sales", "Profit"]
+        )
+
+    metrics = [
+        col for col in ["Sales", "Profit", "Quantity"]
+        if col in df.columns
+    ]
+
+    if not metrics:
+        return pd.DataFrame(columns=["Region"])
+
+    result = (
+        df.groupby("Region", as_index=False)[metrics]
+        .sum()
     )
 
-def top_products(df, n=10):
-    return (
-        df.groupby("Product Name", as_index=False)["Profit"]
+    if "Sales" in result.columns:
+        result = result.sort_values(
+            "Sales",
+            ascending=False,
+        )
+
+    return result
+
+
+def top_products(df, n=10, metric="Profit"):
+    if df.empty or "Product Name" not in df.columns:
+        return pd.DataFrame(
+            columns=[
+                "Product Name",
+                "Sales",
+                "Profit",
+                "Quantity",
+            ]
+        )
+
+    metrics = [
+        col for col in ["Sales", "Profit", "Quantity"]
+        if col in df.columns
+    ]
+
+    if not metrics:
+        return pd.DataFrame(columns=["Product Name"])
+
+    result = (
+        df.groupby("Product Name", as_index=False)[metrics]
         .sum()
-        .sort_values("Profit", ascending=False)
-        .head(n)
     )
+
+    for col in ["Sales", "Profit", "Quantity"]:
+        if col not in result.columns:
+            result[col] = 0
+
+    sort_by = metric if metric in metrics else metrics[0]
+
+    return (
+        result.sort_values(
+            sort_by,
+            ascending=False,
+        )
+        .head(n)
+        .reset_index(drop=True)
+    )
+
 
 def subcategory_profit(df):
+    if not {
+        "Sub-Category",
+        "Profit",
+    }.issubset(df.columns):
+        return pd.DataFrame(
+            columns=["Sub-Category", "Profit"]
+        )
+
     return (
         df.groupby("Sub-Category", as_index=False)["Profit"]
         .sum()
-        .sort_values("Profit")
+        .sort_values("Profit", ascending=True)
     )
+
 
 def insights(df):
     if df.empty:
         return [
-            ("info", "No records match the selected filters."),
+            ("warning", "No records match the current filters.")
         ]
 
-    cat = category_summary(df)
-    reg = region_summary(df)
-    products = top_products(df, 1)
-    sub = subcategory_profit(df)
-    k = kpis(df)
+    output = []
 
-    items = []
+    categories = category_summary(df)
 
-    if not cat.empty:
-        best_cat = cat.iloc[cat["Profit"].idxmax()]
-        items.append(("success",
-            f"{best_cat['Category']} is the most profitable category, "
-            f"generating ${best_cat['Profit']:,.0f} in profit."
+    if (
+        not categories.empty
+        and "Profit" in categories.columns
+    ):
+        best = categories.loc[
+            categories["Profit"].idxmax()
+        ]
+
+        output.append((
+            "success",
+            f"{best['Category']} has the highest category "
+            f"profit (${best['Profit']:,.2f}).",
         ))
 
-    if not reg.empty:
-        best_reg = reg.iloc[reg["Sales"].idxmax()]
-        items.append(("info",
-            f"{best_reg['Region']} leads regional sales with "
-            f"${best_reg['Sales']:,.0f} in revenue."
+    regions = region_summary(df)
+
+    if (
+        not regions.empty
+        and "Sales" in regions.columns
+    ):
+        best = regions.loc[regions["Sales"].idxmax()]
+
+        output.append((
+            "info",
+            f"{best['Region']} leads regional sales "
+            f"(${best['Sales']:,.2f}).",
         ))
+
+    products = top_products(df, 1, "Profit")
 
     if not products.empty:
-        p = products.iloc[0]
-        items.append(("success",
-            f"{p['Product Name']} is the top product by profit at "
-            f"${p['Profit']:,.0f}."
+        product = products.iloc[0]
+
+        output.append((
+            "success",
+            f"Most profitable product: "
+            f"{product['Product Name']} "
+            f"(${product['Profit']:,.2f}).",
         ))
 
-    if not sub.empty:
-        worst = sub.iloc[0]
+    subcategories = subcategory_profit(df)
+
+    if not subcategories.empty:
+        worst = subcategories.iloc[0]
+
         if worst["Profit"] < 0:
-            items.append(("warning",
-                f"{worst['Sub-Category']} is currently loss-making with "
-                f"${abs(worst['Profit']):,.0f} in negative profit."
+            output.append((
+                "warning",
+                f"{worst['Sub-Category']} is loss-making "
+                f"(${worst['Profit']:,.2f}).",
             ))
 
-    items.append(("neutral",
-        f"Average order value is ${k['aov']:,.0f} and average shipping time "
-        f"is {k['shipping']:.1f} days."
+    values = kpis(df)
+
+    output.append((
+        "neutral",
+        f"Profit margin is {values['margin']:.2f}%, "
+        f"with an average order value of "
+        f"${values['aov']:,.2f}.",
     ))
 
-    return items
+    return output
